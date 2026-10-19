@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Perpetuo en vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: una columna. Marcador de tablillas a todo lo ancho en azul Perpetuo; debajo, la pista donde baila Punto.
+   Un solo look deliberado (identidad 2026 sobre crema), igual en tema claro y oscuro. */
+:root {
+  --paper: #FAF6F1;
+  --paper-2: #F1EBE2;
+  --ink: #0D1114;
+  --ink-soft: #4A4F55;
+  --line: #E2DACF;
+  --blue: #074990;
+  --coral: #E2543B;
+  --lime: #C3D73A;
+  --flap: #0D1114;
+  --flap-2: #1A2027;
+  --sans: "Poppins", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+body {
+  font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  background-image: radial-gradient(rgba(13,17,20,.035) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.logo { height: 34px; width: auto; display: block; }
+.logo-fallback { font-weight: 700; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); }
+.live { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-soft); background: var(--paper-2); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); }
+.live.on .dot { background: var(--coral); animation: pulse 1.6s infinite; }
+.live.warn .dot { background: var(--lime); }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+/* ---------- tablero ---------- */
+.board { background: var(--blue); color: var(--paper); border-radius: 22px; padding: 26px clamp(16px, 4vw, 40px) 28px; display: grid; gap: 18px; position: relative; overflow: hidden; }
+.board::after { content: ""; position: absolute; right: -50px; top: -50px; width: 190px; height: 190px; background: var(--lime); clip-path: polygon(12% 8%, 96% 0, 88% 90%, 0 100%); }
+.board::before { content: ""; position: absolute; left: -30px; bottom: -40px; width: 140px; height: 110px; background: var(--coral); clip-path: polygon(0 20%, 92% 0, 100% 74%, 8% 100%); opacity: .95; }
+.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; opacity: .9; position: relative; z-index: 1; }
+.flaps-wrap { display: flex; justify-content: center; position: relative; z-index: 1; min-width: 0; }
+.flaps { display: flex; align-items: flex-end; gap: .05em; font-size: 200px; font-weight: 700; }
+.sep { width: .24em; text-align: center; line-height: 1; color: var(--paper); align-self: flex-end; padding-bottom: .02em; }
+.slot { position: relative; width: .7em; height: 1.06em; perspective: 4em; flex: none; filter: drop-shadow(0 .03em .02em rgba(0,0,0,.25)); }
+.half, .flip { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; background: var(--flap); color: var(--paper); backface-visibility: hidden; }
+.half.top, .flip.top { top: 0; border-radius: .08em .08em 0 0; transform-origin: 50% 100%; background: var(--flap-2); }
+.half.bottom, .flip.bottom { bottom: 0; border-radius: 0 0 .08em .08em; transform-origin: 50% 0; }
+.half span, .flip span { display: block; height: 1.06em; line-height: 1.06em; text-align: center; font-variant-numeric: tabular-nums; }
+.bottom span { transform: translateY(-50%); }
+.flip.bottom { transform: rotateX(90deg); }
+.slot::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - .008em); height: .016em; min-height: 2px; background: var(--blue); z-index: 5; }
+.slot.go .flip.top { animation: flapTop var(--d, 90ms) ease-in forwards; }
+.slot.go .flip.bottom { animation: flapBottom var(--d, 90ms) ease-out var(--d, 90ms) forwards; }
+@keyframes flapTop { from { transform: rotateX(0) } to { transform: rotateX(-90deg) } }
+@keyframes flapBottom { from { transform: rotateX(90deg) } to { transform: rotateX(0) } }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; position: relative; z-index: 1; }
+.chip { font-family: var(--mono); font-size: 14px; padding: 5px 12px; border-radius: 999px; background: rgba(250,246,241,.14); border: 1px solid rgba(250,246,241,.28); color: var(--paper); font-variant-numeric: tabular-nums; }
+.chip b { font-weight: 500; }
+.chip.up b { color: var(--lime); }
+.chip.down b { color: #FFB4A6; }
+
+/* ---------- pista de baile ---------- */
+.floor { position: relative; height: clamp(320px, 44vw, 480px); background: var(--paper-2); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+.floor svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.floor-note { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-soft); font-size: 14px; }
+.caption { position: absolute; top: 14px; left: 18px; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); z-index: 2; }
+.bubble { position: absolute; z-index: 3; left: 50%; top: 16px; transform: translate(-50%, 8px); background: var(--ink); color: var(--paper); font-weight: 700; font-size: clamp(16px, 2.4vw, 22px); padding: 8px 16px; border-radius: 14px; opacity: 0; transition: opacity .3s, transform .3s; white-space: nowrap; }
+.bubble.show { opacity: 1; transform: translate(-50%, 0); }
+.note { position: absolute; z-index: 2; font-size: 40px; font-weight: 700; pointer-events: none; animation: rise 1.6s ease-out forwards; }
+@keyframes rise { 0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x, 30px), -150px) rotate(var(--r, 20deg)) scale(1.1); } }
+
+.confetti { position: fixed; top: -20px; width: 10px; height: 14px; z-index: 50; pointer-events: none; clip-path: polygon(10% 0, 100% 12%, 88% 100%, 0 86%); animation: fall var(--t, 2.4s) cubic-bezier(.25,.6,.4,1) forwards; }
+@keyframes fall { to { transform: translate(var(--x, 0), 105vh) rotate(var(--r, 540deg)); } }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; border-radius: 12px; padding: 10px 18px; border: 2px solid var(--ink); background: var(--ink); color: var(--paper); }
+button.ghost { background: transparent; color: var(--ink); }
+button:hover { transform: translateY(-1px); }
+button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+.hint { font-size: 13px; color: var(--ink-soft); }
+.status { font-size: 13px; color: var(--ink-soft); }
+.status.err { color: var(--coral); font-weight: 500; }
+footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
+code { font-family: var(--mono); font-size: .95em; }
+@media (prefers-reduced-motion: reduce) { .live.on .dot { animation: none; } .confetti, .note { display: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div id="logoBox"><span class="logo-fallback">Revista Perpetuo</span></div>
+    <div class="live" id="live"><span class="dot"></span><span id="liveText">Conectando…</span></div>
+  </header>
+
+  <section class="board" aria-live="polite">
+    <div class="eyebrow">Suscriptores en Substack</div>
+    <div class="flaps-wrap" id="flapsWrap"><div class="flaps" id="flaps" aria-label="Total de suscriptores"></div></div>
+    <div class="chips">
+      <span class="chip up" id="todayUp">Hoy <b>+0</b></span>
+      <span class="chip down" id="todayDown">Hoy <b>−0</b></span>
+      <span class="chip" id="sinceAnchor">Desde el ancla: —</span>
+    </div>
+  </section>
+
+  <section class="floor" id="floor">
+    <span class="caption">Punto</span>
+    <span class="bubble" id="bubble">¡Uno más!</span>
+    <svg id="dance" role="img" aria-label="Punto, personaje de Perpetuo, bailando"></svg>
+  </section>
+
+  <div class="controls">
+    <button id="soundBtn" type="button">Activar sonido</button>
+    <button id="testBtn" type="button" class="ghost">Probar celebración</button>
+    <span class="hint" id="soundHint">El navegador sólo deja sonar la página después de un clic.</span>
+  </div>
+
+  <div class="status" id="status"></div>
+  <footer>Total = ancla del panel de Substack (5,641 · 19 oct 2026, 11:29 CDMX) + altas − bajas registradas en <code>sub_events</code>. Se actualiza cada ~30 s mientras la página está visible.</footer>
+</div>
+
+<script>
+const PUNTO_BODY="M32.2 -454.8 L14.0 -456.5 L-11.0 -456.0 L-35.5 -452.8 L-59.2 -447.5 L-86.5 -439.5 L-109.5 -431.2 L-125.5 -422.8 L-142.5 -411.0 L-158.2 -397.8 L-175.0 -381.0 L-187.2 -366.5 L-198.5 -350.5 L-217.0 -314.5 L-235.2 -274.8 L-238.5 -265.5 L-239.5 -255.0 L-242.8 -244.5 L-243.2 -239.2 L-242.0 -223.5 L-246.0 -215.5 L-246.5 -210.8 L-245.2 -208.0 L-240.0 -205.0 L-238.5 -202.5 L-238.2 -195.2 L-240.8 -182.0 L-241.0 -174.8 L-238.5 -165.8 L-225.2 -131.0 L-224.2 -122.5 L-228.5 -106.5 L-221.0 -95.0 L-214.0 -87.5 L-210.2 -98.2 L-202.5 -89.8 L-183.5 -64.2 L-172.0 -51.0 L-163.2 -44.0 L-148.2 -38.8 L-144.0 -32.5 L-139.0 -28.2 L-115.8 -19.2 L-82.5 -9.5 L-62.8 -5.0 L-50.5 -4.2 L-51.2 6.0 L-45.8 7.5 L-30.8 8.5 L-30.2 -1.8 L-10.0 -2.2 L34.0 -8.8 L36.0 0.2 L37.8 0.8 L54.5 -5.0 L53.8 -10.8 L56.8 -18.0 L84.2 -30.2 L102.8 -41.5 L118.5 -53.8 L136.5 -71.2 L151.2 -88.8 L166.8 -111.5 L177.2 -131.8 L183.0 -150.2 L189.5 -136.2 L192.0 -145.5 L198.0 -155.5 L201.5 -165.5 L193.2 -182.2 L193.8 -193.5 L199.5 -233.0 L198.8 -249.8 L195.2 -275.8 L191.8 -292.8 L186.0 -313.8 L178.0 -335.8 L169.5 -353.5 L159.0 -369.2 L145.0 -385.8 L122.5 -407.2 L99.2 -425.8 L81.8 -437.8 L71.0 -443.8 L51.0 -450.8 Z";
+const PUNTO_EYES=["M 126.105469,-301.808594 C 124.949219,-303.753906 125.746094,-306.265625 122.511719,-309.28125 C 105.515625,-325.136719 81.269531,-328.863281 59.527344,-322.460938 C 1.09375,-305.246094 -10.9375,-234.761719 65.382812,-239.664062 C 93.066406,-241.445312 145.386719,-269.21875 126.164062,-301.710938 C 128.953125,-296.855469 125.375,-279.277344 119.957031,-274.445312 C 91.800781,-249.363281 76.980469,-310.523438 112.484375,-306.988281 C 114.578125,-306.777344 125.722656,-302.429688 126.105469,-301.808594", "M -10.464844,-284.441406 C -10.992188,-292.675781 -23.796875,-300.324219 -30.726562,-302.625 C -64.945312,-313.96875 -110.652344,-292.773438 -128.078125,-261.808594 C -136.558594,-246.738281 -135.523438,-242.015625 -121.984375,-231.222656 C -89.554688,-205.375 -20.289062,-214.949219 -6.691406,-257.074219 C -43.644531,-226.097656 -56.265625,-291.339844 -16.550781,-289.691406 C -10.566406,-289.441406 -14.925781,-283.878906 -10.464844,-284.441406"];
+// ===== Punto: rig vectorial =====
+// Cuerpo y ojos: trazos oficiales de "Personajes Curvas.pdf" (pose de pie). Coordenadas relativas a la cadera.
+// Brazos y piernas: trazos de 17 u con manos redondas y pies ovalados, medidos de la misma pose.
+const Punto = (() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const INK = "#0D1114", EYE = "#FAF6F1";
+  const SH_L = [-212, -100], SH_R = [193, -157];   // hombros (espacio del cuerpo)
+  const HIP_L = [-37, -6], HIP_R = [40, -8];       // caderas
+  const FLOOR = 152;
+  const REST = {
+    rx: 0, ry: 0, flip: 1,
+    bx: 0, by: 0, rot: 0, sx: 1, sy: 1,
+    hL: [-20, 135], hR: [22, 139], bL: -18, bR: 18,         // manos relativas al hombro; curvatura del brazo
+    fL: [-92, 130, 0], fR: [108, 125, 0], kL: -8, kR: 8,     // pies (x, y, giro) en el piso; curvatura de rodilla
+    blink: 1, look: 0
+  };
+  const KEYS = Object.keys(REST);
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.append(e);
+    return e;
+  }
+
+  function create(svg) {
+    svg.setAttribute("viewBox", "-480 -830 960 1090");
+    const root = el("g", {}, svg);
+    el("polygon", { points: "-760,150 760,126 772,214 -772,236", fill: "#E2543B" }, root);
+    const shadow = el("ellipse", { cx: 0, cy: FLOOR + 4, rx: 190, ry: 20, fill: "rgba(13,17,20,.28)" }, root);
+    const fig = el("g", {}, root);
+    const limb = { fill: "none", stroke: INK, "stroke-width": 17, "stroke-linecap": "round" };
+    const legL = el("path", limb, fig), legR = el("path", limb, fig);
+    const footL = el("ellipse", { rx: 60, ry: 23, fill: INK }, fig), footR = el("ellipse", { rx: 64, ry: 23, fill: INK }, fig);
+    const body = el("g", {}, fig);
+    el("path", { d: PUNTO_BODY, fill: INK }, body);
+    const eyes = el("g", {}, body);
+    const eyesInner = el("g", {}, eyes);
+    PUNTO_EYES.forEach(d => el("path", { d, fill: EYE, "fill-rule": "evenodd" }, eyesInner));
+    const armL = el("path", limb, fig), armR = el("path", limb, fig);
+    const handL = el("circle", { r: 37, fill: INK }, fig), handR = el("circle", { r: 36, fill: INK }, fig);
+    return { root, shadow, fig, legL, legR, footL, footR, body, eyes, eyesInner, armL, armR, handL, handR };
+  }
+
+  function xf(p, P) {   // aplica la transformación del cuerpo a un punto
+    const c = Math.cos(P.rot), s = Math.sin(P.rot);
+    const x = p[0] * P.sx, y = p[1] * P.sy;
+    return [P.bx + x * c - y * s, P.by + x * s + y * c];
+  }
+  function hose(a, b, bend) {    // curva tipo "manguera" entre a y b
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    const cx = mx + (-dy / L) * bend, cy = my + (dx / L) * bend;
+    return `M${a[0].toFixed(1)} ${a[1].toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`;
+  }
+
+  function render(R, P) {
+    R.root.setAttribute("transform", `translate(${P.rx.toFixed(1)} 0)`);
+    const lift = -P.ry;  // altura del salto (ry negativo = arriba)
+    const k = Math.max(0.35, 1 - lift / 420);
+    R.shadow.setAttribute("rx", (190 * k).toFixed(1)); R.shadow.setAttribute("ry", (20 * k).toFixed(1));
+    R.fig.setAttribute("transform", `translate(0 ${P.ry.toFixed(1)}) scale(${P.flip.toFixed(3)} 1)`);
+    R.body.setAttribute("transform", `translate(${P.bx.toFixed(1)} ${P.by.toFixed(1)}) rotate(${(P.rot * 57.2958).toFixed(2)}) scale(${P.sx.toFixed(3)} ${P.sy.toFixed(3)})`);
+    R.eyes.setAttribute("transform", `translate(${(P.look * 14).toFixed(1)} 0)`);
+    R.eyesInner.setAttribute("transform", `translate(0 -273) scale(1 ${Math.max(.08, P.blink).toFixed(3)}) translate(0 273)`);
+    const sL = xf(SH_L, P), sR = xf(SH_R, P), hpL = xf(HIP_L, P), hpR = xf(HIP_R, P);
+    const hL = [sL[0] + P.hL[0], sL[1] + P.hL[1]], hR = [sR[0] + P.hR[0], sR[1] + P.hR[1]];
+    R.armL.setAttribute("d", hose(sL, hL, P.bL)); R.armR.setAttribute("d", hose(sR, hR, P.bR));
+    R.handL.setAttribute("cx", hL[0].toFixed(1)); R.handL.setAttribute("cy", hL[1].toFixed(1));
+    R.handR.setAttribute("cx", hR[0].toFixed(1)); R.handR.setAttribute("cy", hR[1].toFixed(1));
+    const ftL = [P.fL[0], P.fL[1]], ftR = [P.fR[0], P.fR[1]];
+    R.legL.setAttribute("d", hose(hpL, [ftL[0] + 14, ftL[1] - 12], P.kL));
+    R.legR.setAttribute("d", hose(hpR, [ftR[0] - 14, ftR[1] - 12], P.kR));
+    R.footL.setAttribute("transform", `translate(${ftL[0].toFixed(1)} ${ftL[1].toFixed(1)}) rotate(${(P.fL[2] * 57.3 - 4).toFixed(1)})`);
+    R.footR.setAttribute("transform", `translate(${ftR[0].toFixed(1)} ${ftR[1].toFixed(1)}) rotate(${(P.fR[2] * 57.3 + 3).toFixed(1)})`);
+  }
+
+  // ---------- coreografía ----------
+  const TAU = Math.PI * 2, PI = Math.PI;
+  const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const easeIO = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const P = (o) => Object.assign({}, REST, o);
+  const mixv = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+  function idle(t) {
+    const br = Math.sin(t * 2.2);
+    const bl = ((t % 3.7) < 0.14) ? 0.1 : 1;
+    return P({ by: 4 * br, sy: 1 + .012 * br, sx: 1 - .008 * br, rot: .02 * Math.sin(t * .9),
+      hL: [-20 - 4 * br, 135 + 3 * br], hR: [22 + 4 * br, 139 + 3 * br], blink: bl, look: .5 * Math.sin(t * .5) });
+  }
+  function groove(b) {            // rebote con las manos arriba ("raise the roof")
+    const d = (1 - Math.cos(TAU * b)) / 2;          // agachada en cada medio tiempo
+    const sw = Math.sin(PI * b);
+    return P({ by: 30 * d, sy: 1 - .06 * d, sx: 1 + .045 * d, rot: .13 * sw, bx: 12 * sw,
+      hL: [-70, -250 + 60 * d], hR: [60, -262 + 60 * d], bL: 40, bR: -40,
+      fL: [-92, 130 - 26 * Math.max(0, sw), 0], fR: [108, 125 - 26 * Math.max(0, -sw), 0],
+      kL: -10 - 26 * d, kR: 10 + 26 * d, look: sw });
+  }
+  function disco(b) {             // señala arriba y abajo (Fiebre de sábado)
+    const p = b - 4, u = (1 - Math.cos(PI * p)) / 2, sway = Math.sin(PI * p);
+    return P({ bx: 35 * sway, by: 12 * (1 - Math.cos(TAU * p)) / 2, rot: -.16 * (1 - 2 * u),
+      hR: mixv([150, -240], [130, 200], u), bR: 50 - 90 * u,
+      hL: [-40, 92], bL: 70,
+      fL: [-92 + 18 * sway, 130, -.1], fR: [128 + 18 * sway, 125, .25 * u],
+      kL: -14, kR: 22, look: 1 - 2 * u });
+  }
+  function jump(b) {              // se agacha, salta y da una vuelta completa
+    const p = (b - 6) / 2;
+    const air = ss(.16, .26, p) * (1 - ss(.74, .84, p));
+    const a = Math.sin(PI * Math.min(1, Math.max(0, (p - .18) / .64)));
+    const crouch = Math.max(Math.sin(PI * Math.min(1, p / .2)) * (p < .2 ? 1 : 0), Math.sin(PI * Math.min(1, Math.max(0, (p - .8) / .2))) * (p > .8 ? 1 : 0));
+    const spin = easeIO(Math.min(1, Math.max(0, (p - .2) / .6)));
+    return P({ ry: -240 * a, by: 42 * crouch, sy: 1 - .14 * crouch + .07 * a, sx: 1 + .1 * crouch - .03 * a,
+      flip: Math.cos(TAU * spin), rot: 0,
+      hL: mixv([-30, 60], [-60, -230], air), hR: mixv([30, 60], [60, -240], air), bL: -30, bR: 30,
+      fL: [-80 + 22 * a, 130 - 60 * a, .3 * a], fR: [96 - 22 * a, 125 - 60 * a, -.3 * a],
+      kL: -10 - 40 * a, kR: 10 + 40 * a });
+  }
+  function twist(b) {             // twist: pies giran, cadera y brazos al contrario
+    const w = Math.sin(TAU * b), bob = (1 - Math.cos(2 * TAU * b)) / 2;
+    return P({ bx: -22 * w, by: 22 + 10 * bob, sy: .96, sx: 1.03, rot: .12 * w,
+      hL: [-85, 20 - 75 * w], hR: [85, 20 + 75 * w], bL: -30, bR: 30,
+      fL: [-82 - 14 * w, 130, .45 * w], fR: [98 - 14 * w, 125, .45 * w],
+      kL: 30 * w, kR: 30 * w, look: -w });
+  }
+  function hops(b) {              // brinquitos de lado a lado aleteando
+    const q = b - 12, hop = Math.abs(Math.sin(PI * q)), land = Math.pow(1 - hop, 6);
+    const dir = Math.sin(PI * q / 1.5);
+    return P({ ry: -80 * hop, rx: 80 * dir, by: 20 * land, sy: 1 - .1 * land + .04 * hop, sx: 1 + .08 * land,
+      rot: .1 * dir, hL: [-130, -40 - 120 * hop], hR: [130, -40 - 120 * hop], bL: -40 + 80 * hop, bR: 40 - 80 * hop,
+      fL: [-92, 130 - 22 * hop, -.2 * hop], fR: [108, 125 - 22 * hop, .2 * hop], kL: -18, kR: 18, look: dir });
+  }
+  function tada(b) {              // pose final
+    const p = Math.min(1, (b - 15) * 1.6), e = Math.sin(PI / 2 * p);
+    return P({ by: -8 * e, sy: 1 + .07 * e, sx: 1 - .03 * e, hL: [-120, -215], hR: [120, -225], bL: 30, bR: -30,
+      fL: [-110, 130, -.15], fR: [126, 125, .15], kL: -16, kR: 16 });
+  }
+  const SEGS = [[0, 4, groove], [4, 6, disco], [6, 8, jump], [8, 12, twist], [12, 15, hops], [15, 16.6, tada]];
+  const BEATS = 16;
+
+  function poseAt(b, t) {         // b = tiempo en beats (null = en reposo), t = segundos
+    const parts = [], F = .22;
+    let sum = 0;
+    if (b !== null) for (const [s, e, fn] of SEGS) {
+      const w = ss(s - F, s + F, b) * (1 - ss(e - F, e + F, b));
+      if (w > 0.001) { parts.push([w, fn(b)]); sum += w; }
+    }
+    if (sum < 1) { parts.push([1 - sum, idle(t)]); sum = 1; }
+    const out = {};
+    for (const key of KEYS) {
+      const v0 = REST[key];
+      if (Array.isArray(v0)) {
+        out[key] = v0.map((_, i) => parts.reduce((acc, [w, p]) => acc + w * p[key][i], 0) / sum);
+      } else out[key] = parts.reduce((acc, [w, p]) => acc + w * p[key], 0) / sum;
+    }
+    if (b !== null) out.blink = Math.min(out.blink, idle(t).blink);
+    return out;
+  }
+  return { create, render, poseAt, BEATS };
+})();
+
+</script>
+<script>
+(() => {
+  // Debe coincidir con el workflow "Métricas Diarias — Recolector" (ANCLA_TOTAL y filtro de fecha).
+
+  const $ = (id) => document.getElementById(id);
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fmt = new Intl.NumberFormat("es-MX");
+  const state = { altas: null, bajas: null, recent: null, seen: null, lastAltas: null, shown: null };
+  let soundOn = false, audio = null;
+
+  // ================= sonido =================
+  function ctx() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } }
+    if (audio && audio.state === "suspended") audio.resume().catch(() => {});
+    return audio;
+  }
+  function ding(at) {
+    const a = ctx(); if (!a) return;
+    const t = at || a.currentTime;
+    [[1318.5, 0], [1975.5, 0.09]].forEach(([f, d]) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.32, t + d + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 1.3);
+      o.connect(g).connect(a.destination); o.start(t + d); o.stop(t + d + 1.4);
+    });
+  }
+  function noise(a, len) {
+    const b = a.createBuffer(1, Math.floor(a.sampleRate * len), a.sampleRate), ch = b.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function kick(a, t) {
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.24);
+  }
+  function hat(a, t, v) {
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = noise(a, 0.05); f.type = "highpass"; f.frequency.value = 7000;
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    s.connect(f).connect(g).connect(a.destination); s.start(t);
+  }
+  function clap(a, t) {
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = noise(a, 0.15); f.type = "bandpass"; f.frequency.value = 1500; f.Q.value = .8;
+    g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    s.connect(f).connect(g).connect(a.destination); s.start(t);
+  }
+  function bass(a, t, f) {
+    const o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+    o.type = "sawtooth"; o.frequency.value = f; lp.type = "lowpass"; lp.frequency.value = 600;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.13, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(lp).connect(g).connect(a.destination); o.start(t); o.stop(t + 0.22);
+  }
+  function groove(beats, beatMs, delayMs) {
+    const a = audio; if (!a || !soundOn) return;
+    const t0 = a.currentTime + 0.03 + (delayMs || 0) / 1000, B = beatMs / 1000;
+    const line = [55, 55, 82.4, 55, 73.4, 55, 82.4, 98];
+    for (let i = 0; i < beats; i++) {
+      const t = t0 + i * B;
+      kick(a, t); hat(a, t + B / 2, 0.09); hat(a, t + B * .75, 0.04);
+      if (i % 2 === 1) clap(a, t);
+      bass(a, t + B / 2, line[i % line.length]);
+    }
+    ding(t0 + beats * B);
+  }
+  function clack() {
+    const a = audio; if (!a || !soundOn || a.state !== "running") return;
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = noise(a, 0.016); f.type = "bandpass"; f.frequency.value = 2400; g.gain.value = 0.1;
+    s.connect(f).connect(g).connect(a.destination); s.start();
+  }
+
+  // ================= marcador de tablillas =================
+  const flaps = $("flaps");
+  let slots = [];
+  function buildSlot(d) {
+    const s = document.createElement("div"); s.className = "slot";
+    s.innerHTML = '<div class="half top"><span></span></div><div class="half bottom"><span></span></div>' +
+                  '<div class="flip top"><span></span></div><div class="flip bottom"><span></span></div>';
+    s._p = { ht: s.children[0].firstChild, hb: s.children[1].firstChild, ft: s.children[2].firstChild, fb: s.children[3].firstChild };
+    setSlot(s, d); return s;
+  }
+  function setSlot(s, d) { const p = s._p; p.ht.textContent = p.hb.textContent = p.ft.textContent = p.fb.textContent = d; s._v = d; }
+  function flipOnce(s, from, to, ms) {
+    return new Promise((res) => {
+      const p = s._p;
+      p.ht.textContent = to; p.hb.textContent = from; p.ft.textContent = from; p.fb.textContent = to;
+      s.style.setProperty("--d", ms + "ms");
+      s.classList.remove("go"); void s.offsetWidth; s.classList.add("go");
+      clack();
+      setTimeout(() => { s.classList.remove("go"); setSlot(s, to); res(); }, ms * 2 + 10);
+    });
+  }
+  async function spinTo(s, target, ms, turns) {
+    if (s._busy) { s._next = { target, ms, turns }; return; }
+    s._busy = true;
+    let cur = Number(s._v), steps = (Number(target) - cur + 10) % 10;
+    if (turns) steps += (steps === 0 ? 10 : 0) + (turns - 1) * 10;
+    if (reduce) { setSlot(s, target); steps = 0; }
+    for (let i = 0; i < steps; i++) { const nx = (cur + 1) % 10; await flipOnce(s, cur, nx, ms); cur = nx; }
+    s._busy = false;
+    if (s._next) { const n = s._next; s._next = null; spinTo(s, n.target, n.ms, n.turns); }
+  }
+  function fitFlaps() {
+    const w = $("flapsWrap").clientWidth;
+    const digits = flaps.querySelectorAll(".slot").length || 4, seps = flaps.querySelectorAll(".sep").length;
+    const em = digits * 0.75 + seps * 0.29;
+    flaps.style.fontSize = Math.max(56, Math.min(300, Math.floor(w / em))) + "px";
+  }
+  function layout(str) {
+    const shape = str.replace(/\d/g, "9");
+    if (flaps._shape === shape) return false;
+    flaps._shape = shape; flaps.textContent = ""; slots = [];
+    for (const ch of str) {
+      if (/\d/.test(ch)) { const s = buildSlot("0"); slots.push(s); flaps.append(s); }
+      else { const sp = document.createElement("span"); sp.className = "sep"; sp.textContent = ch; flaps.append(sp); }
+    }
+    fitFlaps(); return true;
+  }
+  function showNumber(n, opts = {}) {
+    const str = fmt.format(n);
+    flaps.setAttribute("aria-label", "Total de suscriptores: " + str);
+    const fresh = layout(str);
+    const digits = str.replace(/\D/g, "").split("");
+    digits.forEach((d, i) => {
+      const s = slots[i];
+      if (fresh || opts.reveal) setTimeout(() => spinTo(s, d, 55, 1 + (digits.length - 1 - i) % 2), i * 140);
+      else if (s._v !== d || opts.shuffle) spinTo(s, d, 75, opts.shuffle ? 1 : 0);
+    });
+  }
+  layout("0,000");
+  window.addEventListener("resize", fitFlaps);
+
+  // ================= Punto: baile vectorial =================
+  const BEAT = 460, BEATS = Punto.BEATS;   // ~130 bpm
+  const stage = $("dance");
+  const R = Punto.create(stage);
+  let danceStart = -1;
+  function frame(now) {
+    let b = null;
+    if (danceStart >= 0) {
+      b = (now - danceStart) / BEAT - 0.3;
+      if (b > BEATS + 1) { danceStart = -1; b = null; }
+    }
+    Punto.render(R, Punto.poseAt(reduce ? null : b, now / 1000));
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function notes() {
+    if (reduce) return;
+    const glyphs = ["♪", "♫", "♬"], colors = ["#074990", "#E2543B", "#0D1114"];
+    const fl = $("floor"), w = fl.clientWidth, h = fl.clientHeight;
+    for (let i = 0; i < BEATS / 2; i++) setTimeout(() => {
+      const n = document.createElement("span"); n.className = "note";
+      n.textContent = glyphs[i % 3]; n.style.color = colors[i % 3];
+      const side = i % 2 ? 1 : -1;
+      n.style.left = (w / 2 + side * (Math.min(w * .22, 200) + Math.random() * 60)) + "px";
+      n.style.top = (h * .45 + Math.random() * h * .2) + "px";
+      n.style.setProperty("--x", (side * (20 + Math.random() * 40)) + "px");
+      n.style.setProperty("--r", (side * (10 + Math.random() * 25)) + "deg");
+      fl.append(n); setTimeout(() => n.remove(), 1700);
+    }, i * BEAT * 2);
+  }
+  function confetti() {
+    if (reduce) return;
+    const colors = ["#074990", "#E2543B", "#C3D73A", "#0D1114"];
+    for (let i = 0; i < 30; i++) {
+      const c = document.createElement("span"); c.className = "confetti";
+      c.style.left = (Math.random() * 100) + "vw"; c.style.background = colors[i % 4];
+      c.style.setProperty("--x", (Math.random() * 160 - 80) + "px");
+      c.style.setProperty("--r", (Math.random() * 900 - 450) + "deg");
+      c.style.setProperty("--t", (1.8 + Math.random() * 1.4) + "s");
+      c.style.animationDelay = (Math.random() * .4) + "s";
+      document.body.append(c); setTimeout(() => c.remove(), 3800);
+    }
+  }
+  const PHRASES = ["¡Uno más!", "¡Bienvenida, bienvenido!", "¡Otro lector!", "¡Perpetuamente!"];
+  function celebrate(n) {
+    const bub = $("bubble");
+    bub.textContent = n > 1 ? "¡" + n + " más!" : PHRASES[Math.floor(Math.random() * PHRASES.length)];
+    bub.classList.add("show"); setTimeout(() => bub.classList.remove("show"), BEAT * BEATS);
+    confetti();
+    if (soundOn) groove(BEATS, BEAT, 0.3 * BEAT);
+    danceStart = performance.now(); notes();
+  }
+
+  // ================= controles =================
+  $("soundBtn").addEventListener("click", () => {
+    soundOn = !soundOn;
+    if (soundOn) { ctx(); ding(); }
+    $("soundBtn").textContent = soundOn ? "Silenciar" : "Activar sonido";
+    $("soundHint").textContent = soundOn ? "Con cada alta: ritmo, baile y ding." : "Sonido apagado.";
+  });
+  $("testBtn").addEventListener("click", () => {
+    ctx();
+    if (state.shown !== null) showNumber(state.shown, { shuffle: true });
+    celebrate(1);
+  });
+
+  // ================= datos (n8n) =================
+  const API = "https://esperpetuo.app.n8n.cloud/webhook/perpetuo-subs";
+  const POLL_MS = 30000;
+  let lastAltaId = null, lastAltas = 0, timer = null, failures = 0;
+  function setLive(kind, text) { $("live").className = "live " + kind; $("liveText").textContent = text; }
+  function setStatus(text, err) { const s = $("status"); s.textContent = text || ""; s.className = "status" + (err ? " err" : ""); }
+  async function poll() {
+    clearTimeout(timer);
+    try {
+      const r = await fetch(API + "?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      if (typeof d.total !== "number") throw new Error("Respuesta sin total");
+      failures = 0;
+      const first = state.shown === null;
+      if (d.total !== state.shown) showNumber(d.total, { reveal: first });
+      state.shown = d.total;
+      document.title = fmt.format(d.total) + " · Perpetuo en vivo";
+      $("todayUp").innerHTML = "Hoy <b>+" + d.altasHoy + "</b>";
+      $("todayDown").innerHTML = "Hoy <b>−" + d.bajasHoy + "</b>";
+      $("sinceAnchor").textContent = "Desde el ancla: +" + d.altasDesdeAncla + " / −" + d.bajasDesdeAncla;
+      if (lastAltaId !== null && d.lastAltaId > lastAltaId) celebrate(Math.max(1, d.altasDesdeAncla - lastAltas));
+      lastAltaId = d.lastAltaId; lastAltas = d.altasDesdeAncla;
+      setLive("on", "En vivo");
+      setStatus("Última lectura: " + new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    } catch (e) {
+      failures++;
+      setLive("warn", "Reintentando");
+      setStatus("No se pudo leer el contador de n8n (" + (e.message || "error de red") + "). Se reintenta solo.", true);
+    }
+    if (!document.hidden) timer = setTimeout(poll, failures ? Math.min(120000, POLL_MS * 2 ** Math.min(failures, 2)) : POLL_MS);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); else clearTimeout(timer); });
+  poll();
+})();
+</script>
+
+</body>
+</html>
