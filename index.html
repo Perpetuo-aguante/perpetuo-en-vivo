@@ -124,6 +124,7 @@ code { font-family: var(--mono); font-size: .95em; }
   <div class="controls">
     <button id="soundBtn" type="button">Activar sonido</button>
     <button id="testBtn" type="button" class="ghost">Probar celebración</button>
+    <button id="testCry" type="button" class="ghost">Probar llanto</button>
     <span class="hint" id="soundHint">El navegador sólo deja sonar la página después de un clic.</span>
   </div>
 
@@ -292,7 +293,37 @@ const Punto = (() => {
     if (b !== null) out.blink = Math.min(out.blink, idle(t).blink);
     return out;
   }
-  return { create, render, poseAt, BEATS };
+  // ---------- llanto (cuando se va un suscriptor) ----------
+  const CRY_DUR = 7.2;
+  const EYE_TEARS = [[118, -258], [-122, -236]];   // comisuras de los ojos (espacio del cuerpo)
+  function cryPose(t) {
+    const shock = Math.exp(-Math.pow((t - .25) / .18, 2));            // sobresalto inicial
+    const slump = ss(.35, 1.1, t) * (1 - ss(CRY_DUR - 1.2, CRY_DUR - .3, t));
+    const bawl = ss(3.2, 3.6, t) * (1 - ss(5.4, 5.9, t));             // se tapa la cara y llora fuerte
+    const sobRate = bawl > .5 ? .38 : .55;
+    const sob = Math.pow(Math.max(0, Math.sin(TAU * t / sobRate)), 3) * slump;
+    const wipe = Math.sin(TAU * t / 1.1);
+    const handWipe = [-128 + 22 * wipe, -118 + 6 * Math.cos(TAU * t / 1.1)];
+    return P({
+      by: -26 * shock + (36 + 10 * sob + 8 * bawl) * slump,
+      sy: 1 + .06 * shock - (.08 + .035 * sob) * slump,
+      sx: 1 + (.05 + .02 * sob) * slump,
+      rot: (-.07 - .03 * bawl) * slump + .02 * sob * Math.sin(TAU * t * 3),
+      hL: mixv(mixv([-60, -40], [-6, 150], ss(.3, .9, t)), [205, -150], bawl), bL: -10 + 40 * bawl,
+      hR: mixv(mixv([60, -60], [-2, 145], ss(.3, .9, t)), handWipe, ss(1.2, 1.6, t) * (1 - ss(CRY_DUR - 1.4, CRY_DUR - .8, t))), bR: 30,
+      fL: [-78, 130, .15 * slump], fR: [94, 125, -.15 * slump], kL: 14 * slump, kR: -14 * slump,
+      blink: 1 - .55 * slump - .4 * bawl, look: -.6 * slump
+    });
+  }
+  function poseCry(t, now) {
+    const w = ss(0, .25, t) * (1 - ss(CRY_DUR - .5, CRY_DUR, t));
+    const a = cryPose(t), b = idle(now), out = {};
+    for (const key of KEYS) {
+      out[key] = Array.isArray(REST[key]) ? a[key].map((v, i) => b[key][i] + (v - b[key][i]) * w) : b[key] + (a[key] - b[key]) * w;
+    }
+    return out;
+  }
+  return { create, render, poseAt, poseCry, CRY_DUR, EYE_TEARS, xf, BEATS };
 })();
 
 </script>
@@ -364,6 +395,21 @@ const Punto = (() => {
       bass(a, t + B / 2, line[i % line.length]);
     }
     ding(t0 + beats * B);
+  }
+  function sadTrombone() {
+    const a = audio; if (!a || !soundOn) return;
+    const t0 = a.currentTime + 0.25;
+    const notes = [[233.1, 0, .42], [220, .5, .42], [207.7, 1, .42], [196, 1.5, 1.5]];
+    notes.forEach(([f, at, len], i) => {
+      const o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+      o.type = "sawtooth"; lp.type = "lowpass"; lp.frequency.value = 900; lp.Q.value = 3;
+      const t = t0 + at;
+      o.frequency.setValueAtTime(f * 1.03, t); o.frequency.exponentialRampToValueAtTime(f, t + .08);
+      if (i === 3) { const v = a.createOscillator(), vg = a.createGain(); v.frequency.value = 5.5; vg.gain.value = 6; v.connect(vg).connect(o.frequency); v.start(t + .3); v.stop(t + len); o.frequency.exponentialRampToValueAtTime(f * .94, t + len); }
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + .04);
+      g.gain.setValueAtTime(0.22, t + len - .12); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(lp).connect(g).connect(a.destination); o.start(t); o.stop(t + len + .05);
+    });
   }
   function clack() {
     const a = audio; if (!a || !soundOn || a.state !== "running") return;
@@ -437,14 +483,48 @@ const Punto = (() => {
   const BEAT = 460, BEATS = Punto.BEATS;   // ~130 bpm
   const stage = $("dance");
   const R = Punto.create(stage);
-  let danceStart = -1;
+  let danceStart = -1, cryStart = -1, lastNow = performance.now(), tearClock = 0, tearSide = 0;
+  const NS = "http://www.w3.org/2000/svg";
+  const tearLayer = document.createElementNS(NS, "g"); R.root.append(tearLayer);
+  const tears = [];
+  const TEAR = "M0 -16 C6 -5 10 2 10 7 A10 10 0 1 1 -10 7 C-10 2 -6 -5 0 -16 Z";
+  function spawnTear(P) {
+    const [ex, ey] = Punto.xf(Punto.EYE_TEARS[tearSide], P); const side = tearSide ? -1 : 1; tearSide = 1 - tearSide;
+    const el = document.createElementNS(NS, "path");
+    el.setAttribute("d", TEAR); el.setAttribute("fill", "#8FB8EC"); el.setAttribute("stroke", "#074990"); el.setAttribute("stroke-width", "3");
+    tearLayer.append(el);
+    tears.push({ el, x: P.flip * ex, y: P.ry + ey, vx: side * (60 + Math.random() * 90), vy: -140 - Math.random() * 120, life: 0, s: .8 + Math.random() * .6 });
+  }
   function frame(now) {
-    let b = null;
-    if (danceStart >= 0) {
-      b = (now - danceStart) / BEAT - 0.3;
-      if (b > BEATS + 1) { danceStart = -1; b = null; }
+    const dt = Math.min(.05, (now - lastNow) / 1000); lastNow = now;
+    let P;
+    if (cryStart >= 0 && !reduce) {
+      const t = (now - cryStart) / 1000;
+      if (t > Punto.CRY_DUR) { cryStart = -1; P = Punto.poseAt(null, now / 1000); }
+      else {
+        P = Punto.poseCry(t, now / 1000);
+        const bawl = t > 3.3 && t < 5.6;
+        tearClock += dt;
+        if (t > .7 && t < Punto.CRY_DUR - .9 && tearClock > (bawl ? .07 : .16)) { tearClock = 0; spawnTear(P); if (bawl) spawnTear(P); }
+      }
+    } else {
+      let b = null;
+      if (danceStart >= 0) {
+        b = (now - danceStart) / BEAT - 0.3;
+        if (b > BEATS + 1) { danceStart = -1; b = null; }
+      }
+      P = Punto.poseAt(reduce ? null : b, now / 1000);
     }
-    Punto.render(R, Punto.poseAt(reduce ? null : b, now / 1000));
+    Punto.render(R, P);
+    for (let i = tears.length - 1; i >= 0; i--) {
+      const d = tears[i]; d.life += dt; d.vy += 1100 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+      const floor = 150, landed = d.y >= floor;
+      if (landed) { d.y = floor; d.vx = 0; d.vy = 0; d.splat = (d.splat || 0) + dt; }
+      const k = landed ? Math.max(0, 1 - d.splat / .5) : 1;
+      d.el.setAttribute("transform", `translate(${d.x.toFixed(1)} ${d.y.toFixed(1)}) scale(${(d.s * (landed ? 1.6 : 1)).toFixed(2)} ${(d.s * (landed ? .35 : 1)).toFixed(2)})`);
+      d.el.setAttribute("opacity", k.toFixed(2));
+      if (k <= 0 || d.life > 3) { d.el.remove(); tears.splice(i, 1); }
+    }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -477,6 +557,14 @@ const Punto = (() => {
       document.body.append(c); setTimeout(() => c.remove(), 3800);
     }
   }
+  const SAD = ["Se nos fue uno…", "Snif.", "Vuelve pronto…", "Perpetuamente te extrañaremos"];
+  function lament(n) {
+    const bub = $("bubble");
+    bub.textContent = n > 1 ? n + " se fueron… snif." : SAD[Math.floor(Math.random() * SAD.length)];
+    bub.classList.add("show"); setTimeout(() => bub.classList.remove("show"), Punto.CRY_DUR * 1000);
+    sadTrombone();
+    danceStart = -1; cryStart = performance.now(); tearClock = 0;
+  }
   const PHRASES = ["¡Uno más!", "¡Bienvenida, bienvenido!", "¡Otro lector!", "¡Perpetuamente!"];
   function celebrate(n) {
     const bub = $("bubble");
@@ -484,7 +572,7 @@ const Punto = (() => {
     bub.classList.add("show"); setTimeout(() => bub.classList.remove("show"), BEAT * BEATS);
     confetti();
     if (soundOn) groove(BEATS, BEAT, 0.3 * BEAT);
-    danceStart = performance.now(); notes();
+    cryStart = -1; danceStart = performance.now(); notes();
   }
 
   // ================= controles =================
@@ -500,10 +588,12 @@ const Punto = (() => {
     celebrate(1);
   });
 
+  $("testCry").addEventListener("click", () => { ctx(); lament(1); });
+
   // ================= datos (n8n) =================
   const API = "https://esperpetuo.app.n8n.cloud/webhook/perpetuo-subs";
   const POLL_MS = 30000;
-  let lastAltaId = null, lastAltas = 0, timer = null, failures = 0;
+  let lastAltaId = null, lastAltas = 0, lastBajas = null, timer = null, failures = 0;
   function setLive(kind, text) { $("live").className = "live " + kind; $("liveText").textContent = text; }
   function setStatus(text, err) { const s = $("status"); s.textContent = text || ""; s.className = "status" + (err ? " err" : ""); }
   async function poll() {
@@ -522,7 +612,11 @@ const Punto = (() => {
       $("todayDown").innerHTML = "Hoy <b>−" + d.bajasHoy + "</b>";
       $("sinceAnchor").textContent = "Desde el ancla: +" + d.altasDesdeAncla + " / −" + d.bajasDesdeAncla;
       if (lastAltaId !== null && d.lastAltaId > lastAltaId) celebrate(Math.max(1, d.altasDesdeAncla - lastAltas));
-      lastAltaId = d.lastAltaId; lastAltas = d.altasDesdeAncla;
+      if (lastBajas !== null && d.bajasDesdeAncla > lastBajas) {
+        const perdidos = d.bajasDesdeAncla - lastBajas, huboAlta = lastAltaId !== null && d.lastAltaId > lastAltaId;
+        setTimeout(() => lament(perdidos), huboAlta ? 8000 : 0);
+      }
+      lastAltaId = d.lastAltaId; lastAltas = d.altasDesdeAncla; lastBajas = d.bajasDesdeAncla;
       setLive("on", "En vivo");
       setStatus("Última lectura: " + new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     } catch (e) {
