@@ -384,15 +384,54 @@ const Punto = (() => {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.13, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     o.connect(lp).connect(g).connect(a.destination); o.start(t); o.stop(t + 0.22);
   }
+  // ---- cumbia original (sintetizada): güiro, llamador, bombo, bajo y acordeón ----
+  function guiro(a, t, len, v) {           // raspado: ruido con "dientes" a ~70 Hz
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), am = a.createGain(), lfo = a.createOscillator();
+    s.buffer = noise(a, len + 0.02); f.type = "bandpass"; f.frequency.value = 4200; f.Q.value = 1.2;
+    lfo.type = "square"; lfo.frequency.value = len > 0.15 ? 70 : 110; lfo.connect(am.gain); am.gain.value = 0.5;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.01);
+    g.gain.setValueAtTime(v, t + len * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    s.connect(f).connect(am).connect(g).connect(a.destination); lfo.start(t); lfo.stop(t + len + 0.02); s.start(t);
+  }
+  function llamador(a, t) {                // tambor del contratiempo
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(190, t + 0.08);
+    g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.13);
+  }
+  function acordeon(a, t, f, len) {        // dos lengüetas desafinadas + fuelle
+    const g = a.createGain(), lp = a.createBiquadFilter(), trem = a.createOscillator(), tg = a.createGain();
+    lp.type = "lowpass"; lp.frequency.value = 2600;
+    trem.frequency.value = 6; tg.gain.value = 0.025; trem.connect(tg).connect(g.gain);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+    g.gain.setValueAtTime(0.09, t + len * 0.85); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    [0, 6].forEach(cents => {
+      const o = a.createOscillator(); o.type = "square"; o.frequency.value = f; o.detune.value = cents;
+      o.connect(lp); o.start(t); o.stop(t + len + 0.02);
+    });
+    lp.connect(g).connect(a.destination); trem.start(t); trem.stop(t + len + 0.02);
+  }
   function groove(beats, beatMs, delayMs) {
     const a = audio; if (!a || !soundOn) return;
     const t0 = a.currentTime + 0.03 + (delayMs || 0) / 1000, B = beatMs / 1000;
-    const line = [55, 55, 82.4, 55, 73.4, 55, 82.4, 98];
+    const A4 = 440, B4 = 493.9, C5 = 523.3, D5 = 587.3, E5 = 659.3, Gs4 = 415.3, _ = 0;
+    const acordes = ["Am", "Am", "E", "E", "E", "E", "Am", "Am"];           // un acorde por tiempo
+    const bajo = { Am: [55, 82.4], E: [41.2, 61.7] };                        // tónica y quinta
+    const frase = [E5, _, C5, A4, C5, E5, _, _,   D5, _, B4, Gs4, B4, D5, _, _,
+                   B4, C5, D5, _, D5, C5, B4, Gs4,   A4, _, _, _, A4, C5, E5, _];
+    const final = frase.slice(0, 24).concat([A4, _, _, _, _, _, _, _]);
     for (let i = 0; i < beats; i++) {
-      const t = t0 + i * B;
-      kick(a, t); hat(a, t + B / 2, 0.09); hat(a, t + B * .75, 0.04);
-      if (i % 2 === 1) clap(a, t);
-      bass(a, t + B / 2, line[i % line.length]);
+      const t = t0 + i * B, ac = acordes[i % 8];
+      if (i % 2 === 0) kick(a, t);                                           // bombo al inicio del compás
+      llamador(a, t + B / 2);                                                // contratiempo
+      guiro(a, t, B * 0.45, 0.12); guiro(a, t + B / 2, B * 0.18, 0.08); guiro(a, t + B * 0.75, B * 0.18, 0.08);
+      bass(a, t, bajo[ac][i % 2]);
+      const notas = i < 8 ? frase : final, k = (i % 8) * 4;
+      for (let j = 0; j < 4; j++) {                                          // rejilla de semicorcheas
+        const f = notas[k + j]; if (!f) continue;
+        let dur = 1; while (dur < 4 && k + j + dur < notas.length && !notas[k + j + dur]) dur++;
+        acordeon(a, t + j * B / 4, f, dur * B / 4 * 0.9);
+      }
     }
     ding(t0 + beats * B);
   }
