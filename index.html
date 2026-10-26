@@ -129,7 +129,7 @@ code { font-family: var(--mono); font-size: .95em; }
   </div>
 
   <div class="status" id="status"></div>
-  <footer>Total = ancla del panel de Substack (5,641 · 19 oct 2026, 11:29 CDMX) + altas − bajas registradas en <code>sub_events</code>. Se actualiza cada ~30 s mientras la página está visible.</footer>
+  <footer>Total = ancla del panel de Substack (5,641 · 19 oct 2026, 11:29 CDMX) + altas − bajas registradas en <code>sub_events</code>. Se actualiza cada ~5 min mientras la página está visible.</footer>
 </div>
 
 <script>
@@ -590,9 +590,10 @@ const Punto = (() => {
 
   $("testCry").addEventListener("click", () => { ctx(); lament(1); });
 
-  // ================= datos (n8n) =================
-  const API = "https://esperpetuo.app.n8n.cloud/webhook/perpetuo-subs";
-  const POLL_MS = 30000;
+  // ================= datos (Apps Script) =================
+  // Contador servido por Google Apps Script (cuenta los correos de Substack). No gasta ejecuciones de n8n.
+  const API = "https://script.google.com/macros/s/AKfycbwEWDMt7o9eCnkMM-nHI4kqExS9ne00BUYJa-lVKEJZenC8Ao1DzIEfy_63re702Dfy6Q/exec";
+  const POLL_MS = 300000;   // cada 5 min
   let lastAltaId = null, lastAltas = 0, lastBajas = null, timer = null, failures = 0;
   function setLive(kind, text) { $("live").className = "live " + kind; $("liveText").textContent = text; }
   function setStatus(text, err) { const s = $("status"); s.textContent = text || ""; s.className = "status" + (err ? " err" : ""); }
@@ -622,9 +623,9 @@ const Punto = (() => {
     } catch (e) {
       failures++;
       setLive("warn", "Reintentando");
-      setStatus("No se pudo leer el contador de n8n (" + (e.message || "error de red") + "). Se reintenta solo.", true);
+      setStatus("No se pudo leer el contador (" + (e.message || "error de red") + "). Se reintenta solo.", true);
     }
-    if (!document.hidden) timer = setTimeout(poll, failures ? Math.min(120000, POLL_MS * 2 ** Math.min(failures, 2)) : POLL_MS);
+    if (!document.hidden) timer = setTimeout(poll, failures ? 60000 : POLL_MS);
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); else clearTimeout(timer); });
   poll();
